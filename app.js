@@ -3,6 +3,7 @@
 const express = require("express");
 const bodyParser = require("body-parser");
 const ejs = require("ejs");
+const mongoose = require("mongoose");
 const _ = require("lodash");
 
 const homeStartingContent = "Lacus vel facilisis volutpat est velit egestas dui id ornare. Semper auctor neque vitae tempus quam. Sit amet cursus sit amet dictum sit amet justo. Viverra tellus in hac habitasse. Imperdiet proin fermentum leo vel orci porta. Donec ultrices tincidunt arcu non sodales neque sodales ut. Mattis molestie a iaculis at erat pellentesque adipiscing. Magnis dis parturient montes nascetur ridiculus mus mauris vitae ultricies. Adipiscing elit ut aliquam purus sit amet luctus venenatis lectus. Ultrices vitae auctor eu augue ut lectus arcu bibendum at. Odio euismod lacinia at quis risus sed vulputate odio ut. Cursus mattis molestie a iaculis at erat pellentesque adipiscing.";
@@ -11,14 +12,31 @@ const contactContent = "Scelerisque eleifend donec pretium vulputate sapien. Rho
 
 const app = express();
 
+require("dotenv").config(); 
+const srvr = process.env.N1_KEY; 
+const srvrCred = process.env.N1_SECRET; 
+
 app.set('view engine', 'ejs');
 app.use(bodyParser.urlencoded({extended: true}));
 app.use(express.static("public"));
 
-const posts = [];
+mongoose.connect("mongodb+srv://"+srvr+":"+srvrCred+"@cluster0.iyod0tt.mongodb.net/blogDB");
+
+const postSchema = {
+  title: String,
+  content: String
+ };
+
+const Post = mongoose.model("Post", postSchema);
 
 app.get("/", function(req, res) {
-  res.render("home", {homeStartingC: homeStartingContent, postsA: posts});
+  Post.find(function(err, posts) {
+    if (err) {
+        console.log(err);
+    } else {
+        res.render("home", {homeStartingC: homeStartingContent, postsA: posts});
+    }
+  })
 });
 
 app.get("/about", function(req, res) {
@@ -34,28 +52,29 @@ app.get("/compose", function(req, res) {
 });
 
 app.post("/compose", function(req, res) {
-  const post = {
+  const post = new Post ({
     title: req.body.postTitle,
-    body: req.body.postBody
-}
-  posts.push(post);
+    content: req.body.postBody
+  });
+  post.save();
   res.redirect("/");
 });
 
-app.get("/posts/:postName/", function (req, res) {
+app.get("/posts/:postId/", function (req, res) {
   let pTitle = "404";
   let pBody = "Post not found.";
-  if(posts.length>0) {
-    posts.forEach((post) => {
-      if(_.lowerCase(post.title) === _.lowerCase(req.params.postName)) {
-        //console.log("Match found!");
-        pTitle = post.title;
-        pBody = post.body;
-        return true;
+  const custom = req.params.postId;
+  Post.findOne({_id: custom}, function(err, found) {
+      if (!err) {
+          if (!found) {
+            res.render("post", {postTitle: pTitle, postBody: pBody})
+          } else {
+            pTitle = found.title;
+            pBody = found.content;
+            res.render("post", {postTitle: pTitle, postBody: pBody})
+          }
       }
-    });
-  }
-  res.render("post", {postTitle: pTitle, postBody: pBody});
+  });
 })
 
 
